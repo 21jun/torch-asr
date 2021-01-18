@@ -25,7 +25,7 @@ class MelSpectrogramDataset(Dataset):
         self.has_transcript = has_transcript
 
         char_map_str = """
-        _ 0
+        ' 0
         <SPACE> 1
         a 2
         b 3
@@ -53,7 +53,6 @@ class MelSpectrogramDataset(Dataset):
         x 25
         y 26
         z 27
-        ' 28
         """
         self.char_map = {}
         self.index_map = {}
@@ -77,7 +76,8 @@ class MelSpectrogramDataset(Dataset):
                 ch = self.char_map[c]
             int_sequence.append(ch)
 
-        int_seq = [self.sos_id] + int_sequence + [self.eos_id]
+        # int_seq = [self.sos_id] + int_sequence + [self.eos_id]
+        int_seq = int_sequence
         return int_seq, text
 
     def __len__(self) -> int:
@@ -100,6 +100,7 @@ class MelSpectrogramDataset(Dataset):
 
 class LibriSpeechDataModule(pl.LightningDataModule):
     def __init__(self, batch_size, download_path, train_url, test_url):
+        super().__init__()
         self.batch_size = batch_size
         self.download_path = download_path
         self.train_url = train_url
@@ -145,7 +146,6 @@ class LibriSpeechDataModule(pl.LightningDataModule):
         self.test_dataset = MelSpectrogramDataset(
             self.test_dataset, self.test_transforms)
 
-    @staticmethod
     def collate_fn(data):
         # input = spects, label = int_seq
         # it's real length (before padding)

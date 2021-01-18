@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+import pytorch_lightning as pl
+
 
 class CNNLayerNorm(nn.Module):
     """Layer normalization built for cnns input"""
@@ -107,3 +109,35 @@ class SpeechRecognitionModel(nn.Module):
         x = self.birnn_layers(x)
         x = self.classifier(x)
         return x
+
+
+class SpeechRecognitionModule(pl.LightningModule):
+
+    def __init__(self, n_cnn_layers, n_rnn_layers, rnn_dim, n_class, n_feats, len_train, stride=2, dropout=0.1):
+        super().__init__()
+        self.save_hyperparameters()
+        self.len_train = len_train
+        self.criterion = nn.CTCLoss(blank=1)
+
+        self.model = SpeechRecognitionModel(
+            n_cnn_layers, n_rnn_layers, rnn_dim, n_class, n_feats, stride, dropout)
+
+    def configure_optimizers(self):
+        opt = optim.AdamW(self.model.parameters(), 5e-4)
+        sch = optim.lr_scheduler.OneCycleLR(opt, max_lr=5e-4,
+                                            steps_per_epoch=self.len_train,
+                                            epochs=2,
+                                            anneal_strategy='linear')
+        return [opt], [sch]
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+    def training_step(self, batch, batch_index):
+        spectrograms, labels, input_lengths, label_lengths = batch
+        output = self.model(spectrograms)
+        output = F.log_softmax(output, dim=2)
+        output = output.transpose(0, 1)
+        loss = self.criterion(output, labels, input_lengths, label_lengths)
+        return {"loss": loss}
